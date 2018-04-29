@@ -76,11 +76,9 @@ class TraktBackendPlugin:
         self.interval = float(section.get('interval', self.interval))
         self.timeout = float(section.get('timeout', 30))
 
-        self.core.download.register_notify_completed(self._on_download_completed)
-        self.core.metadata.plugins.insert(0, TraktMetadataPlugin(self))
-
     async def start(self):
-        pass
+        self.core.metadata.plugins.insert(0, TraktMetadataPlugin(self))
+        self.core.download.register_notify_completed(self._on_download_completed)
 
     async def run(self):
         while True:
