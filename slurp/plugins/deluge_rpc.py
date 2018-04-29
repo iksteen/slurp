@@ -155,7 +155,7 @@ class DelugeRpcDownloadPlugin:
         'torrent:magnet',
     ]
 
-    _interval = 10
+    _interval = 60
     _rpc_host = 'localhost'
     _rpc_port = 58846
     _rpc_username = None
