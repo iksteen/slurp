@@ -63,7 +63,6 @@ class RenameProcessingPlugin:
         for path, path_info in files.items():
             file_size = path_info['size']
             file_keys = path_info['episode_keys']
-            print(file_keys)
 
             if not file_keys:
                 logger.info('Ignoring file {}, not enough information.'.format(path))
