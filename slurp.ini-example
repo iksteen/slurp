@@ -57,3 +57,7 @@
 ; format = {show}/Season {season:02}/{show} - {season_str}{episode_str} - {title}{ext}
 ; dir_mode = 770
 ; file_mode = 660
+
+[slurp.metadata.tvdb]
+# Create an api key on https://www.thetvdb.com/?tab=apiregister
+; api_key =

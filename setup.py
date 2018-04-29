@@ -41,6 +41,7 @@ setup(
             'trakt = slurp.plugins.trakt:TraktBackendPlugin',
         ],
         'slurp.plugins.metadata': [
+            'tvdb = slurp.plugins.tvdb:TheTVDBMetadataPlugin',
             'scene_names = slurp.plugins.scene_names:SceneNamesMetadataPlugin',
         ],
         'slurp.plugins.search': [

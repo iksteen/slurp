@@ -1,15 +1,8 @@
 import asyncio
 
 SCENE_NAMES = {
-    78804: 'Doctor Who (2005)',
-    110381: 'Archer (2009)',
     248841: 'Scandal (US)',
-    262980: 'House of Cards (2013)',
     263365: 'Marvels Agents of S.H.I.E.L.D',
-    265074: 'Legends (2014)',
-    277169: 'Faking It (2014)',
-    279121: 'The Flash (2014)',
-    281535: 'Forever (2014)',
     281709: 'The Librarians (US)',
     321239: 'The Handmaids Tale',
 }
