@@ -7,6 +7,8 @@ import os
 import re
 import shutil
 
+from slurp.plugin_types import ProcessingPlugin
+
 logger = logging.getLogger(__name__)
 
 UNSAFE_CHARS = re.compile(r'[\\/:*?"<>|]')
@@ -16,7 +18,7 @@ COMMON_EXTENSIONS = {
 }
 
 
-class RenameProcessingPlugin:
+class RenameProcessingPlugin(ProcessingPlugin):
     _destination = None
     _filename_format = os.path.join(
         '{show}',

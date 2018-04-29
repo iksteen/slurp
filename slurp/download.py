@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from slurp.plugin_types import ProcessingPlugin, DownloadPlugin
 from slurp.util import format_episode_info, guess_episode_keys_for_path, load_plugins, filter_show_name
 
 logger = logging.getLogger(__name__)
@@ -20,8 +21,8 @@ class Download:
 
         self._notify_completed = [log_completed]
 
-        self.processing_plugins = load_plugins('processing', 10, core, loop=self.loop)
-        self.download_plugins = load_plugins('download', 10, core, loop=self.loop)
+        self.processing_plugins = load_plugins('processing', ProcessingPlugin, 10, core, loop=self.loop)
+        self.download_plugins = load_plugins('download', DownloadPlugin, 10, core, loop=self.loop)
 
     async def start(self):
         return await asyncio.gather(*(plugin.start() for plugin in self.processing_plugins + self.download_plugins))

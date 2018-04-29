@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 
+from slurp.plugin_types import BackendPlugin, MetadataPlugin
 from slurp.util import format_episode_info, filter_show_name
 
 logger = logging.getLogger(__name__)
@@ -15,7 +16,7 @@ class UnknownError(Exception):
     pass
 
 
-class TraktMetadataPlugin:
+class TraktMetadataPlugin(MetadataPlugin):
     def __init__(self, backend):
         self.backend = backend
 
@@ -35,7 +36,7 @@ class TraktMetadataPlugin:
             episode_info.setdefault('metadata', {})['episode_title'] = result['title']
 
 
-class TraktBackendPlugin:
+class TraktBackendPlugin(BackendPlugin):
     username = None
     client_id = None  # For oauth2 access
     client_secret = None  # For oauth2 access

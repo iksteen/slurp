@@ -89,7 +89,7 @@ def parse_option_list(s):
     ])
 
 
-def load_plugins(section_name, default_priority, core, *args, **kwargs):
+def load_plugins(section_name, abc, default_priority, core, *args, **kwargs):
     config_section = {}
     try:
         config_section = dict(core.config.items('slurp.{}'.format(section_name)))
@@ -105,9 +105,13 @@ def load_plugins(section_name, default_priority, core, *args, **kwargs):
         except ValueError:
             logger.exception('Failed to parse downloader plugin priority')
         else:
+            plugin_class = entrypoint.load()
+            if not issubclass(plugin_class, abc):
+                logger.error('{} does not implement {}'.format(plugin_class, abc))
+                continue
+
             if priority:
                 try:
-                    plugin_class = entrypoint.load()
                     plugin = plugin_class(core, *args, **kwargs)
                 except:
                     logger.exception('Failed to load plugin:')

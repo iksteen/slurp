@@ -9,6 +9,7 @@ import guessit
 from babelfish import Language, Country
 from defusedxml.ElementTree import fromstring
 
+from slurp.plugin_types import SearchPlugin
 from slurp.util import filter_show_name
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ def json_dumps(value):
     return json.dumps(value, default=json_serializer)
 
 
-class TorrentLeechSearchPlugin:
+class TorrentLeechSearchPlugin(SearchPlugin):
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()

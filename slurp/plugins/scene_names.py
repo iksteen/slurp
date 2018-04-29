@@ -1,5 +1,7 @@
 import asyncio
 
+from slurp.plugin_types import MetadataPlugin
+
 SCENE_NAMES = {
     248841: 'Scandal (US)',
     263365: 'Marvels Agents of S.H.I.E.L.D',
@@ -8,7 +10,7 @@ SCENE_NAMES = {
 }
 
 
-class SceneNamesMetadataPlugin:
+class SceneNamesMetadataPlugin(MetadataPlugin):
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()

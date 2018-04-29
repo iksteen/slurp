@@ -1,10 +1,12 @@
 import asyncio
 import logging
 
+from slurp.plugin_types import MetadataPlugin
+
 logger = logging.getLogger(__name__)
 
 
-class TheTVDBMetadataPlugin:
+class TheTVDBMetadataPlugin(MetadataPlugin):
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()

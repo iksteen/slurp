@@ -7,6 +7,7 @@ import pkg_resources
 from slurp.backlog import Backlog
 from slurp.download import Download
 from slurp.metadata import Metadata
+from slurp.plugin_types import BackendPlugin
 from slurp.search import Search
 
 logger = logging.getLogger(__name__)
@@ -31,9 +32,13 @@ class Core:
             backend_name = 'trakt'
 
         for entrypoint in pkg_resources.iter_entry_points('slurp.plugins.backend'):
+            plugin_class = entrypoint.load()
+            if not issubclass(plugin_class, BackendPlugin):
+                logger.error('{} does not implement {}'.format(plugin_class, BackendPlugin))
+                continue
+
             if entrypoint.name == backend_name:
-                backend_plugin = entrypoint.load()
-                self.backend = backend_plugin(self, loop=self.loop)
+                self.backend = plugin_class(self, loop=self.loop)
                 break
         else:
             logger.error('Could not find back end plugin %s' % backend_name)

@@ -4,6 +4,7 @@ import logging
 from cidict import cidict
 from configparser import NoSectionError
 
+from slurp.plugin_types import SearchPlugin
 from slurp.util import filter_show_name, guess_episode_info, parse_option_list, load_plugins, format_episode_info
 
 DEFAULT_BLACKLIST = 'core2hd,chamee'
@@ -49,7 +50,7 @@ class Search:
 
         self._blacklist = parse_option_list(blacklist)
 
-        self.plugins = load_plugins('search', 0, core, loop=self.loop)
+        self.plugins = load_plugins('search', SearchPlugin, 0, core, loop=self.loop)
 
     async def start(self):
         self.core.backlog.register_notify_backlog(self._search_episode)

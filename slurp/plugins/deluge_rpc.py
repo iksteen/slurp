@@ -11,6 +11,7 @@ from configparser import NoSectionError
 import bencoder
 import pyrencode
 
+from slurp.plugin_types import DownloadPlugin
 from slurp.util import key_for_episode, format_episode_info
 
 logger = logging.getLogger(__name__)
@@ -136,7 +137,7 @@ class DelugeRpcClient(object):
         return await conn.call_remote(method_name, *args, **kwargs)
 
 
-class DelugeRpcDownloadPlugin:
+class DelugeRpcDownloadPlugin(DownloadPlugin):
     media = [
         'torrent:url',
         'torrent:magnet',

@@ -5,12 +5,13 @@ import urllib.parse
 import re
 from bs4 import BeautifulSoup
 
+from slurp.plugin_types import SearchPlugin
 from slurp.util import format_episode_info
 
 logger = logging.getLogger(__name__)
 
 
-class LeetXSearchPlugin:
+class LeetXSearchPlugin(SearchPlugin):
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()
