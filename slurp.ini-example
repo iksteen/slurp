@@ -1,0 +1,59 @@
+[slurp.search]
+; blacklist = core2hd,chamee
+; interval = 3600
+; start_delay = 300
+
+; priority.torrentleech = 5
+; priority.1337x = 10
+
+# valid keys: verified,origin,rank,proper
+; sort_order = verified,origin,rank
+
+# example screen sizes: 480p, 720p, unknown
+# example (subtitle_)languages: he, en, unknown
+
+; filter.screen_size =
+; filter.language =
+; filter.subtitle_language =
+
+; require.screen_size =
+; require.language =
+; require.subtitle_language =
+
+[slurp.download]
+; priority.deluge_rpc = 10
+
+[slurp.backend.trakt]
+# Create trakt.tv application and grant yourself access. Fill in following details:
+; client_id =
+; client_secret =
+; pin_code =
+; username =
+
+; interval = 3600
+; timeout = 30
+; base_url = https://api.trakt.tv
+; custom_list =
+
+[slurp.download.deluge_rpc]
+; rpc_host = localhost
+; rpc_port = 58846
+; rpc_username =
+; rpc_password =
+
+; seed_limit = 1.0
+; seed_limit.torrentleech = 0.0
+
+[slurp.search.torrentleech]
+; rss_key =
+; db_host =
+; db_port =
+; db_user =
+; db_password =
+; db_name = slurp
+
+[slurp.renamer]
+; destination = /media/multimedia/series
+; format = {show}/Season {season:02}/{show} - {season_str}{episode_str} - {title}{ext}
+; dir_mode = 770
+; file_mode = 660
