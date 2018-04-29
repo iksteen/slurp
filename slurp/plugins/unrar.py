@@ -40,8 +40,6 @@ def extract_archive(path):
 
 
 class UnrarProcessingPlugin:
-    priority = 10
-
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()
