@@ -60,7 +60,7 @@ class Download:
 
     async def download_completed(self, files):
         for post_processor in self.processing_plugins:
-            files = await post_processor(files)
+            files = await post_processor.process(files)
 
         backlog_map = {
             (

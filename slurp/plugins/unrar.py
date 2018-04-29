@@ -51,7 +51,7 @@ class UnrarProcessingPlugin:
     async def run(self):
         pass
 
-    async def __call__(self, files):
+    async def process(self, files):
         async with self.sem:
             async def process_archive(path):
                 try:

@@ -53,7 +53,7 @@ class RenameProcessingPlugin:
     async def run(self):
         pass
 
-    async def __call__(self, files):
+    async def process(self, files):
         return files
 
     async def _on_download_completed(self, _, files):
