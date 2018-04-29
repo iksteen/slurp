@@ -26,24 +26,21 @@ class DelugeRpcClientProtocol(asyncio.Protocol):
         self._buffer = bytearray()
 
     def connection_made(self, transport):
-        def on_authenticated(f):
-            exc = f.exception()
-            if exc is not None:
-                try:
-                    raise exc
-                except:
-                    logger.exception('Failed to authenticate to Deluge:')
-                    self.client.connection_failed(exc)
+        async def authenticate():
+            try:
+                await self.call_remote(
+                    'daemon.login',
+                    self.client.username,
+                    self.client.password
+                )
+            except Exception as exc:
+                logger.exception('Failed to authenticate to Deluge:')
+                self.client.connection_failed(exc)
             else:
                 self.client.connection_made(self)
 
         self.transport = transport
-        f = self.loop.create_task(self.call_remote(
-            'daemon.login',
-            self.client.username,
-            self.client.password
-        ))
-        f.add_done_callback(on_authenticated)
+        self.loop.create_task(authenticate())
 
     def data_received(self, data):
         self._buffer.extend(data)
@@ -62,10 +59,7 @@ class DelugeRpcClientProtocol(asyncio.Protocol):
                 self._pending.pop(request_id).set_result(result)
             elif message[0] == 2:
                 request_id, (err_class, err_msg, err_tb) = message[1:]
-                try:
-                    raise Exception(err_msg)
-                except Exception as e:
-                    self._pending.pop(request_id).set_exception(e)
+                self._pending.pop(request_id).set_exception(Exception(err_msg))
         except:
             logger.exception('Error while processing Deluge RPC repsonse:')
 
@@ -94,7 +88,6 @@ class DelugeRpcClient(object):
         self._port = port
         self.username = username
         self.password = password
-        self._connector = None
         self._connection = None
         self._connection_fs = None
 
@@ -108,26 +101,21 @@ class DelugeRpcClient(object):
             return await f
 
         self._connection_fs = [f]
+
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
         try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            self._connector = self.loop.create_task(self.loop.create_connection(
+            await self.loop.create_task(self.loop.create_connection(
                 lambda: DelugeRpcClientProtocol(self, loop=self.loop),
                 self._host,
                 self._port,
                 ssl=ctx,
             ))
-            await self._connector
         except Exception as e:
             self.connection_failed(e)
 
         return await f
-
-    def connection_failed(self, exc):
-        fs, self._connection_fs = self._connection_fs, None
-        for f in fs:
-            f.set_exception(exc)
 
     def connection_made(self, connection):
         self._connection = connection
@@ -135,18 +123,17 @@ class DelugeRpcClient(object):
         for f in fs:
             f.set_result(self._connection)
 
+    def connection_failed(self, exc):
+        fs, self._connection_fs = self._connection_fs, None
+        for f in fs:
+            f.set_exception(exc)
+
     def connection_lost(self):
         self._connection = None
 
     async def call_remote(self, method_name, *args, **kwargs):
         conn = await self._get_connection()
         return await conn.call_remote(method_name, *args, **kwargs)
-
-    def disconnect(self):
-        if self._connection is not None:
-            self._connection.cloase()
-        if self._connector is not None:
-            self._connector.cancel()
 
 
 class DelugeRpcDownloadPlugin:
