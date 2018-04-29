@@ -19,7 +19,7 @@ def format_episode_info(episode_info):
 
 
 def key_for_episode(episode_info):
-    return filter_show_name(episode_info['metadata']['show_title']), episode_info['season'], episode_info['episode']
+    return episode_info['show_id'], episode_info['season'], episode_info['episode']
 
 
 FILTER_STRIP_CHARS = re.compile(r'["()\[\]]')

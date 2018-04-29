@@ -199,7 +199,6 @@ class Search:
             return
 
         result, info = results[0]
-        show_title = episode_info['metadata']['show_title']
         season = episode_info['season']
 
         for medium, data in result['media'].items():
@@ -212,7 +211,7 @@ class Search:
 
         episodes_info = []
         for episode in episode_list:
-            key = (filter_show_name(show_title), season, episode)
+            key = (episode_info['show_id'], season, episode)
             episode_info = self.core.backlog.get(key)
             if episode_info is not None:
                 episodes_info.append(episode_info)

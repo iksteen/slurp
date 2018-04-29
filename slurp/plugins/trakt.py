@@ -203,6 +203,7 @@ class TraktBackendPlugin:
                 episode_number = episode['number']
                 coros.append(self._add_or_remove_episode(
                     {
+                        'show_id': show['ids']['slug'],
                         'season': season_number,
                         'episode': int(episode_number),
                         'ids': show['ids'],

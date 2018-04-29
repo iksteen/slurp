@@ -20,11 +20,11 @@ class Backlog:
 
     async def add_episode(self, episode_info):
         logger.info('Adding {} to backlog queue'.format(format_episode_info(episode_info)))
-        await self.core.metadata.enrich(episode_info)
-
         key = key_for_episode(episode_info)
         if key in self._backlog:
             return
+
+        await self.core.metadata.enrich(episode_info)
 
         self._backlog[key] = episode_info
 
@@ -55,6 +55,9 @@ class Backlog:
 
     def values(self):
         return self._backlog.values()
+
+    def items(self):
+        return self._backlog.items()
 
     def __getitem__(self, item):
         return self._backlog[item]

@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from slurp.util import format_episode_info, guess_episode_keys_for_path, load_plugins
+from slurp.util import format_episode_info, guess_episode_keys_for_path, load_plugins, filter_show_name
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,27 @@ class Download:
         for post_processor in self.processing_plugins:
             files = await post_processor(files)
 
+        backlog_map = {
+            (
+                filter_show_name(episode_info['metadata']['show_title']),
+                episode_info['season'],
+                episode_info['episode'],
+            ): episode_key
+            for episode_key, episode_info in self.core.backlog.items()
+        }
+
+        def find_episode_keys(path):
+            episode_keys = guess_episode_keys_for_path(path)
+            return frozenset([
+                backlog_map[episode_key]
+                for episode_key in episode_keys
+                if episode_key in backlog_map
+            ])
+
         files = {
             path: {
                 'size': file_size,
-                'episode_keys': guess_episode_keys_for_path(path)
+                'episode_keys': find_episode_keys(path),
             }
             for path, file_size in files
         }
@@ -75,7 +92,6 @@ class Download:
             for episode_key in set().union(
                 *[v['episode_keys'] for v in files.values()]
             )
-            if episode_key in self.core.backlog
         ]
 
         await asyncio.gather(*(callback(episodes_info, files) for callback in self._notify_completed))
