@@ -32,7 +32,7 @@ class RenameProcessingPlugin:
         self.loop = loop if loop is not None else asyncio.get_event_loop()
 
         try:
-            section = dict(core.config.items('slurp.renamer'))
+            section = dict(core.config.items('slurp.processing.renamer'))
         except NoSectionError:
             section = {}
 

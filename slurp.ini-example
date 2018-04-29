@@ -52,7 +52,7 @@
 ; db_password =
 ; db_name = slurp
 
-[slurp.renamer]
+[slurp.processing.renamer]
 ; destination = /media/multimedia/series
 ; format = {show}/Season {season:02}/{show} - {season_str}{episode_str} - {title}{ext}
 ; dir_mode = 770
