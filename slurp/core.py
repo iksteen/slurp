@@ -45,18 +45,12 @@ class Core:
             self.backend = None
 
     async def run(self):
-        await asyncio.gather(
-            self.metadata.start(),
-            self.search.start(),
-            self.download.start(),
-            self.backend.start(),
-        )
-        return await asyncio.gather(
-            self.metadata.run(),
-            self.search.run(),
-            self.download.run(),
-            self.backend.run(),
-        )
+        engines = [self.metadata, self.search, self.download]
+        if self.backend is not None:
+            engines.append(self.backend)
+
+        await asyncio.gather(*(e.start() for e in engines))
+        await asyncio.gather(*(e.run() for e in engines))
 
     def save_config(self):
         with open(self.config_path + '.tmp', 'w') as f:
