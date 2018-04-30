@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 
+from slurp.backlog import EpisodeBacklogItem, MovieBacklogItem
 from slurp.plugin_types import PostProcessingPlugin
 
 logger = logging.getLogger(__name__)
@@ -19,12 +20,15 @@ COMMON_EXTENSIONS = {
 
 
 class RenameProcessingPlugin(PostProcessingPlugin):
-    _destination = None
-    _filename_format = os.path.join(
+    _episode_destination = None
+    _episode_format = os.path.join(
         '{show}',
         'Season {season}',
         '{show} - {season_str}{episode_str} - {title}{ext}'
     )
+    _movie_destination = None
+    _movie_format = '{title} ({year}){ext}'
+
     _strategy = 'copy'
     _dir_mode = 0o755
     _file_mode = 0o644
@@ -38,11 +42,16 @@ class RenameProcessingPlugin(PostProcessingPlugin):
         except NoSectionError:
             section = {}
 
-        self._destination = section.get('destination')
-        if not self._destination:
-            raise ValueError('You must set a destination path to use the renamer plugin.')
+        self._episode_destination = section.get('episode_destination')
+        if not self._episode_destination:
+            raise ValueError('You must set an episode destination path to use the renamer plugin.')
+        self._episode_format = section.get('format', self._episode_format)
 
-        self._filename_format = section.get('format', self._filename_format)
+        self._movie_destination = section.get('movie_destination')
+        if not self._episode_destination:
+            raise ValueError('You must set a movie destination path to use the renamer plugin.')
+        self._movie_format = section.get('format', self._movie_format)
+
         self._strategy = section.get('strategy', self._strategy)
         self._dir_mode = int(section.get('dir_mode', oct(self._dir_mode)), 8)
         self._file_mode = int(section.get('file_mode', oct(self._file_mode)), 8)
@@ -92,7 +101,7 @@ class RenameProcessingPlugin(PostProcessingPlugin):
         return await self._rename_files(files)
 
     async def _rename_files(self, files):
-        def get_destination(backlog_items, ext):
+        def get_episode_destination(backlog_items, ext):
             backlog_items = sorted(backlog_items, key=lambda item: item.episode)
 
             show = UNSAFE_CHARS.sub('_', backlog_items[0].metadata['show_title'])
@@ -111,8 +120,8 @@ class RenameProcessingPlugin(PostProcessingPlugin):
             title = UNSAFE_CHARS.sub(' ', '&'.join([e.metadata['episode_title'] for e in backlog_items]))
 
             return os.path.join(
-                self._destination,
-                self._filename_format.format(
+                self._episode_destination,
+                self._episode_format.format(
                     show=show,
                     season=season,
                     season_str=season_str,
@@ -122,6 +131,27 @@ class RenameProcessingPlugin(PostProcessingPlugin):
                     ext=ext,
                 )
             )
+
+        def get_movie_destination(backlog_item, ext):
+            title = UNSAFE_CHARS.sub('_', backlog_item.metadata['movie_title'])
+            year = backlog_item.metadata['year']
+
+            return os.path.join(
+                self._movie_destination,
+                self._movie_format.format(
+                    title=title,
+                    year=year,
+                    ext=ext,
+                )
+            )
+
+        def get_destination(backlog_items, ext):
+            if isinstance(backlog_items[0], EpisodeBacklogItem):
+                return get_episode_destination(backlog_items, ext)
+            elif isinstance(backlog_items[0], MovieBacklogItem):
+                return get_movie_destination(backlog_items[0], ext)
+            else:
+                return None
 
         return await self.loop.run_in_executor(
             None,
@@ -137,15 +167,19 @@ class RenameProcessingPlugin(PostProcessingPlugin):
 
     def _copy_or_move_files(self, rename_files):
         for source, destination in rename_files:
+            if destination is None:
+                continue
             try:
                 self._copy_or_move_file(source, destination)
             except Exception as e:
-                def log_error():
-                    logger.exception(
-                        'Failed to %s %s to %s' % (self._strategy, source, destination),
-                        exc_info=e
-                    )
-                self.loop.call_soon_threadsafe(log_error)
+                def log_error(e):
+                    def log():
+                        logger.exception(
+                            'Failed to %s %s to %s' % (self._strategy, source, destination),
+                            exc_info=e
+                        )
+                    return log
+                self.loop.call_soon_threadsafe(log_error(e))
 
     def _copy_or_move_file(self, source, destination):
         mask = os.umask(0)

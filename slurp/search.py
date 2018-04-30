@@ -4,7 +4,7 @@ import logging
 from cidict import cidict
 from configparser import NoSectionError
 
-from slurp.backlog import BacklogItem
+from slurp.backlog import EpisodeBacklogItem, MovieBacklogItem
 from slurp.plugin_types import SearchPlugin
 from slurp.util import filter_show_name, guess_media_info, parse_option_list, load_plugins
 
@@ -97,6 +97,7 @@ class Search:
         results = tuple(self._filter_dl_blacklist(results))
         results = tuple(self._guess_media_info(results))
         results = tuple(self._filter_by_info(results, backlog_item))
+        results = tuple(self._filter_by_config(results))
         results = tuple(self._sort_search_results(results))
         await self._download_result(results, backlog_item)
 
@@ -132,40 +133,65 @@ class Search:
         ]
 
     def _filter_by_info(self, results, backlog_item):
+        if isinstance(backlog_item, EpisodeBacklogItem):
+            show_info = guess_media_info(backlog_item.metadata['show_title'])
+            show_title = filter_show_name(show_info['title'])
+            season = backlog_item.season
+            episode = backlog_item.episode
+
+            return [
+                (result, info)
+                for result, info in results
+                if
+                (
+                        'title' in info and filter_show_name(info['title']) == show_title
+                        and ('year' not in show_info or show_info['year'] == info.get('year'))
+                        and ('country' not in show_info or show_info['country'] == info.get('country'))
+                        and 'season' in info and info['season'] == season
+                        and 'episode' in info and episode in info['episode']
+                )
+            ]
+        elif isinstance(backlog_item, MovieBacklogItem):
+            movie_info = guess_media_info(backlog_item.metadata['movie_title'])
+            movie_title = filter_show_name(movie_info['title'])
+            year = backlog_item.metadata['year']
+
+            return [
+                (result, info)
+                for result, info in results
+                if
+                (
+                    'title' in info and filter_show_name(info['title']) == movie_title
+                    and year == info.get('year')
+                )
+            ]
+        else:
+            return []
+
+    def _filter_by_config(self, results):
         def set_from_value_or_list(value):
             if not isinstance(value, list):
                 value = [value]
             return set([str(v).lower() for v in value])
-
-        show_info = guess_media_info(backlog_item.metadata['show_title'])
-        show_title = filter_show_name(show_info['title'])
-        season = backlog_item.season
-        episode = backlog_item.episode
 
         return [
             (result, info)
             for result, info in results
             if
             (
-                    'title' in info and filter_show_name(info['title']) == show_title
-                    and ('year' not in show_info or show_info['year'] == info.get('year'))
-                    and ('country' not in show_info or show_info['country'] == info.get('country'))
-                    and 'season' in info and info['season'] == season
-                    and 'episode' in info and episode in info['episode']
-                    and
-                    (
-                        not any([
-                            (value & set_from_value_or_list(info.get(key, 'unknown')))
-                            for key, value in self._filter.items()
-                        ])
-                    )
-                    and
-                    (
-                        all([
-                            (value & set_from_value_or_list(info.get(key, 'unknown')))
-                            for key, value in self._require.items()
-                        ])
-                    )
+                (
+                    not any([
+                        (value & set_from_value_or_list(info.get(key, 'unknown')))
+                        for key, value in self._filter.items()
+                    ])
+                )
+                and
+                (
+                    all([
+                        (value & set_from_value_or_list(info.get(key, 'unknown')))
+                        for key, value in self._require.items()
+                    ])
+                )
             )
         ]
 
@@ -200,21 +226,28 @@ class Search:
             return
 
         result, info = results[0]
-        season = original_backlog_item.season
 
-        for medium, data in result['media'].items():
-            self._dl_blacklist.setdefault(
-                medium,
-                []
-            ).append(data)
+        if isinstance(original_backlog_item, EpisodeBacklogItem):
+            season = original_backlog_item.season
 
-        episode_list = info['episode']
+            for medium, data in result['media'].items():
+                self._dl_blacklist.setdefault(
+                    medium,
+                    []
+                ).append(data)
 
-        backlog_items = []
-        for episode in episode_list:
-            placeholder = BacklogItem(original_backlog_item.show_id, season, episode, original_backlog_item.metadata)
-            backlog_item = self.core.backlog.find(placeholder)
-            if backlog_item is not None:
-                backlog_items.append(backlog_item)
+            episode_list = info['episode']
+
+            backlog_items = []
+            for episode in episode_list:
+                placeholder = EpisodeBacklogItem(original_backlog_item.object_id, season, episode,
+                                                 original_backlog_item.metadata)
+                backlog_item = self.core.backlog.find(placeholder)
+                if backlog_item is not None:
+                    backlog_items.append(backlog_item)
+        elif isinstance(original_backlog_item, MovieBacklogItem):
+            backlog_items = [original_backlog_item]
+        else:
+            return
 
         return await self.core.download.download(backlog_items, result)

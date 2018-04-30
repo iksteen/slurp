@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+from slurp.backlog import EpisodeBacklogItem
 from slurp.plugin_types import MetadataPlugin
 
 logger = logging.getLogger(__name__)
@@ -23,6 +24,9 @@ class TheTVDBMetadataPlugin(MetadataPlugin):
         pass
 
     async def enrich(self, backlog_item):
+        if not isinstance(backlog_item, EpisodeBacklogItem):
+            return
+
         retries = 2
         try:
             while retries > 0:

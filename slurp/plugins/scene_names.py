@@ -1,5 +1,6 @@
 import asyncio
 
+from slurp.backlog import EpisodeBacklogItem
 from slurp.plugin_types import MetadataPlugin
 
 SCENE_NAMES = {
@@ -24,6 +25,9 @@ class SceneNamesMetadataPlugin(MetadataPlugin):
         pass
 
     async def enrich(self, backlog_item):
+        if not isinstance(backlog_item, EpisodeBacklogItem):
+            return
+
         backlog_item.metadata['show_title'] = SCENE_NAMES.get(
             backlog_item.metadata['ids']['tvdb'],
             backlog_item.metadata['show_title'],

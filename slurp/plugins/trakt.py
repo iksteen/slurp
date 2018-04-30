@@ -1,8 +1,9 @@
 import asyncio
+import itertools
 import json
 import logging
 
-from slurp.backlog import BacklogItem
+from slurp.backlog import EpisodeBacklogItem, MovieBacklogItem
 from slurp.plugin_types import BackendPlugin, MetadataPlugin
 
 logger = logging.getLogger(__name__)
@@ -27,11 +28,14 @@ class TraktMetadataPlugin(MetadataPlugin):
         pass
 
     async def enrich(self, backlog_item):
+        if not isinstance(backlog_item, EpisodeBacklogItem):
+            return
+
         try:
             result = await self.backend.trakt_request(
                 'shows/{slug}/seasons/{season}/episodes/{episode}',
                 {
-                    'slug': backlog_item.show_id,
+                    'slug': backlog_item.object_id,
                     'season': backlog_item.season,
                     'episode': backlog_item.episode,
                 }
@@ -58,17 +62,21 @@ class TraktPostProcessorPlugin(PostProcessorPlugin):
 
     async def process(self, backlog_items, _):
         episodes = {}
+        movies = []
         for backlog_item in backlog_items:
             logger.info('Marking {} completed on trakt.tv'.format(backlog_item))
-            episodes.setdefault(
-                backlog_item.show_id,
-                {}
-            ).setdefault(
-                backlog_item.season,
-                set()
-            ).add(
-                backlog_item.episode
-            )
+            if isinstance(backlog_item, EpisodeBacklogItem):
+                episodes.setdefault(
+                    backlog_item.object_id,
+                    {}
+                ).setdefault(
+                    backlog_item.season,
+                    set()
+                ).add(
+                    backlog_item.episode
+                )
+            elif isinstance(backlog_item, MovieBacklogItem):
+                movies.append(backlog_item.object_id)
 
         try:
             await self.backend.trakt_request(
@@ -94,6 +102,14 @@ class TraktPostProcessorPlugin(PostProcessorPlugin):
                             ],
                         }
                         for slug, seasons in episodes.items()
+                    ],
+                    'movies': [
+                        {
+                            'ids': {
+                                'slug': slug
+                            }
+                        }
+                        for slug in movies
                     ],
                 },
             )
@@ -255,7 +271,7 @@ class TraktBackendPlugin(BackendPlugin):
                 return json.loads(response)
 
     async def _add_or_remove_episode(self, show, season, episode, collected):
-        item = BacklogItem(
+        item = EpisodeBacklogItem(
             show['ids']['slug'],
             season,
             episode,
@@ -265,9 +281,9 @@ class TraktBackendPlugin(BackendPlugin):
             },
         )
         if collected:
-            self.core.backlog.remove_episode(item)
+            self.core.backlog.remove_item(item)
         else:
-            await self.core.backlog.add_episode(item)
+            await self.core.backlog.add_item(item)
 
     async def _process_show_progress(self, progress, show, rt_progress):
         coros = []
@@ -302,7 +318,7 @@ class TraktBackendPlugin(BackendPlugin):
         await asyncio.gather(*(check_progress(show) for show in shows))
 
     @staticmethod
-    def _process_collection_progress(data):
+    def _process_show_collection_progress(data):
         return {
             show['show']['ids']['slug']: {
                 season['number']: [
@@ -314,27 +330,71 @@ class TraktBackendPlugin(BackendPlugin):
             for show in data
         }
 
-    async def _process_list_content(self, data):
-        shows = [show['show'] for show in data if show['type'] == 'show']
-
-        removed_shows = self.core.backlog.shows - set([show['ids']['slug'] for show in shows])
+    async def _process_show_list_content(self, shows):
+        removed_shows = self.core.backlog.object_ids(EpisodeBacklogItem) - set([show['ids']['slug'] for show in shows])
         for show_id in removed_shows:
-            self.core.backlog.remove_show(show_id)
+            self.core.backlog.remove_by_object_id(show_id)
 
         try:
             data = await self.trakt_request('sync/collection/shows')
         except:
             logger.exception('Failed to retrieve collection progress from trakt.tv:')
         else:
-            await self._check_show_progress(self._process_collection_progress(data), shows)
+            await self._check_show_progress(self._process_show_collection_progress(data), shows)
+
+    async def _process_movies_list_content(self, movies):
+        movie_ids = {movie['ids']['slug'] for movie in movies}
+
+        for movie_id in self.core.backlog.object_ids(MovieBacklogItem) - movie_ids:
+            self.core.backlog.remove_by_object_id(movie_id)
+
+        if not movie_ids:
+            return
+
+        try:
+            data = await self.trakt_request('users/{}/collection/movies'.format(self.username))
+        except:
+            logger.exception('Failed to retrieve collection progress from trakt.tv:')
+        else:
+            collected_movie_ids = set([movie['movie']['ids']['slug'] for movie in data])
+
+            async def _add_or_remove_movie(movie):
+                item = MovieBacklogItem(
+                    movie['ids']['slug'],
+                    {
+                        'ids': movie['ids'],
+                        'movie_title': movie['title'],
+                        'year': movie['year'],
+                    },
+                )
+                if item.object_id in collected_movie_ids:
+                    self.core.backlog.remove_item(item)
+                else:
+                    await self.core.backlog.add_item(item)
+
+            await asyncio.gather(*(_add_or_remove_movie(movie) for movie in movies))
 
     async def _check_progress(self):
-        try:
-            if self.custom_list:
+        if self.custom_list:
+            try:
                 data = await self.trakt_request('users/{username}/lists/{list}/items', {'list': self.custom_list})
+            except:
+                logger.exception('Failed to get trakt.tv list:')
             else:
-                data = await self.trakt_request('sync/watchlist/shows')
-        except:
-            logger.exception('Failed to get trakt.tv list:')
+                await asyncio.gather(
+                    self._process_show_list_content([item['show'] for item in data if item['type'] == 'show']),
+                    self._process_movies_list_content([item['movie'] for item in data if item['type'] == 'movie']),
+                )
         else:
-            await self._process_list_content(data)
+            try:
+                shows, movies = await asyncio.gather(
+                    self.trakt_request('sync/watchlist/shows'),
+                    await self.trakt_request('sync/watchlist/movies')
+                )
+            except:
+                logger.exception('Failed to get trakt.tv list:')
+            else:
+                await asyncio.gather(
+                    self._process_show_list_content(shows),
+                    self._process_movies_list_content(movies),
+                )

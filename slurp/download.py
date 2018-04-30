@@ -8,31 +8,38 @@ from slurp.util import load_plugins, filter_show_name, guess_media_info
 logger = logging.getLogger(__name__)
 
 
-def guess_episode_keys_for_path(path):
+def guess_identity_for_path(path):
     filename = os.path.split(path)[1]
 
     info = guess_media_info(filename)
-    if info.get('type') != 'episode' or 'season' not in info or 'episode' not in info:
+    if info.get('type') not in ('episode', 'movie') or \
+            (info['type'] == 'episode' and ('season' not in info or 'episode' not in info)) or \
+            (info['type'] == 'movie' and 'year' not in info):
         info = guess_media_info(path)
-        if info.get('type') != 'episode' or 'season' not in info or 'episode' not in info:
+        if info.get('type') not in ('episode', 'movie') or \
+                (info['type'] == 'episode' and ('season' not in info or 'episode' not in info)) or \
+                (info['type'] == 'movie' and 'year' not in info):
             return []
 
-    show = filter_show_name(info['title'])
-    if 'year' in info:
-        show += ' {}'.format(info['year'])
-    if 'country' in info:
-        show += ' {}'.format(str(info['country']).lower())
+    if info['type'] == 'episode':
+        show = filter_show_name(info['title'])
+        if 'year' in info:
+            show += ' {}'.format(info['year'])
+        if 'country' in info:
+            show += ' {}'.format(str(info['country']).lower())
 
-    season = info['season']
-    if isinstance(info['episode'], int):
-        episodes = frozenset([info['episode']])
+        season = info['season']
+        if isinstance(info['episode'], int):
+            episodes = frozenset([info['episode']])
+        else:
+            episodes = frozenset(info['episode'])
+
+        return frozenset([
+            (show, season, episode)
+            for episode in episodes
+        ])
     else:
-        episodes = frozenset(info['episode'])
-
-    return frozenset([
-        (show, season, episode)
-        for episode in episodes
-    ])
+        return frozenset([(filter_show_name(info['title']), info['year'])])
 
 
 class Download:
@@ -84,21 +91,17 @@ class Download:
         for processor in self.pre_processing_plugins:
             files = await processor.process(files)
 
-        episode_key_backlog_item_map = {
-            (
-                filter_show_name(backlog_item.metadata['show_title']),
-                backlog_item.season,
-                backlog_item.episode,
-            ): backlog_item.key
+        identity_backlog_item_key_map = {
+            backlog_item.identity(): backlog_item.key
             for backlog_item in self.core.backlog.values()
         }
 
         def find_backlog_keys(path):
-            episode_keys = guess_episode_keys_for_path(path)
+            episode_keys = guess_identity_for_path(path)
             return frozenset([
-                episode_key_backlog_item_map[episode_key]
+                identity_backlog_item_key_map[episode_key]
                 for episode_key in episode_keys
-                if episode_key in episode_key_backlog_item_map
+                if episode_key in identity_backlog_item_key_map
             ])
 
         files = {
@@ -118,4 +121,4 @@ class Download:
 
         for backlog_item in backlog_items:
             logger.info('Download completed: {}'.format(backlog_item))
-            self.core.backlog.remove_episode(backlog_item)
+            self.core.backlog.remove_item(backlog_item)
