@@ -1,10 +1,38 @@
 import asyncio
 import logging
+import os
 
 from slurp.plugin_types import DownloadPlugin, PreProcessingPlugin, PostProcessingPlugin
-from slurp.util import format_episode_info, guess_episode_keys_for_path, load_plugins, filter_show_name
+from slurp.util import load_plugins, filter_show_name, guess_media_info
 
 logger = logging.getLogger(__name__)
+
+
+def guess_episode_keys_for_path(path):
+    filename = os.path.split(path)[1]
+
+    info = guess_media_info(filename)
+    if info.get('type') != 'episode' or 'season' not in info or 'episode' not in info:
+        info = guess_media_info(path)
+        if info.get('type') != 'episode' or 'season' not in info or 'episode' not in info:
+            return []
+
+    show = filter_show_name(info['title'])
+    if 'year' in info:
+        show += ' {}'.format(info['year'])
+    if 'country' in info:
+        show += ' {}'.format(str(info['country']).lower())
+
+    season = info['season']
+    if isinstance(info['episode'], int):
+        episodes = frozenset([info['episode']])
+    else:
+        episodes = frozenset(info['episode'])
+
+    return frozenset([
+        (show, season, episode)
+        for episode in episodes
+    ])
 
 
 class Download:
@@ -30,16 +58,16 @@ class Download:
     def supported_media(self):
         return set().union(*(provider.media for provider in self.download_plugins))
 
-    def is_downloading(self, episode_info):
-        return any(provider.is_downloading(episode_info) for provider in self.download_plugins)
+    def is_downloading(self, backlog_item):
+        return any(provider.is_downloading(backlog_item) for provider in self.download_plugins)
 
-    async def download(self, episodes_info, data):
-        episodes_info = [
-            episode_info
-            for episode_info in episodes_info
-            if not self.is_downloading(episode_info)
+    async def download(self, backlog_items, data):
+        backlog_items = [
+            backlog_item
+            for backlog_item in backlog_items
+            if not self.is_downloading(backlog_item)
         ]
-        if not episodes_info:
+        if not backlog_items:
             return
 
         media = set(data['media'])
@@ -50,46 +78,44 @@ class Download:
         else:
             raise Exception('Could not find download provider for media types %s' % ','.join(media))
 
-        await provider.download(episodes_info, data)
+        await provider.download(backlog_items, data)
 
     async def download_completed(self, files):
         for processor in self.pre_processing_plugins:
             files = await processor.process(files)
 
-        backlog_map = {
+        episode_key_backlog_item_map = {
             (
-                filter_show_name(episode_info['metadata']['show_title']),
-                episode_info['season'],
-                episode_info['episode'],
-            ): episode_key
-            for episode_key, episode_info in self.core.backlog.items()
+                filter_show_name(backlog_item.metadata['show_title']),
+                backlog_item.season,
+                backlog_item.episode,
+            ): backlog_item.key
+            for backlog_item in self.core.backlog.values()
         }
 
-        def find_episode_keys(path):
+        def find_backlog_keys(path):
             episode_keys = guess_episode_keys_for_path(path)
             return frozenset([
-                backlog_map[episode_key]
+                episode_key_backlog_item_map[episode_key]
                 for episode_key in episode_keys
-                if episode_key in backlog_map
+                if episode_key in episode_key_backlog_item_map
             ])
 
         files = {
             path: {
                 'size': file_size,
-                'episode_keys': find_episode_keys(path),
+                'backlog_keys': find_backlog_keys(path),
             }
             for path, file_size in files
         }
 
-        episodes_info = [
-            self.core.backlog[episode_key]
-            for episode_key in set().union(
-                *[v['episode_keys'] for v in files.values()]
-            )
+        backlog_items = [
+            self.core.backlog[backlog_item_key]
+            for backlog_item_key in set().union(*[v['backlog_keys'] for v in files.values()])
         ]
 
-        await asyncio.gather(*(processor.process(episodes_info, files) for processor in self.post_processing_plugins))
+        await asyncio.gather(*(processor.process(backlog_items, files) for processor in self.post_processing_plugins))
 
-        for episode_info in episodes_info:
-            logger.info('Download completed: {}'.format(format_episode_info(episode_info)))
-            self.core.backlog.remove_episode(episode_info)
+        for backlog_item in backlog_items:
+            logger.info('Download completed: {}'.format(backlog_item))
+            self.core.backlog.remove_episode(backlog_item)

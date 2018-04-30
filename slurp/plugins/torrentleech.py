@@ -151,7 +151,7 @@ class TorrentLeechSearchPlugin(SearchPlugin):
             ttl = 60 * int(channel.find('ttl').text)
             await asyncio.sleep(ttl)
 
-    async def search(self, episode_info):
+    async def search(self, backlog_item):
         results = await self._pool.fetch(
             '''
                 SELECT *
@@ -160,9 +160,9 @@ class TorrentLeechSearchPlugin(SearchPlugin):
                 AND metadata->>'season' = $2
                 AND metadata->>'episode'= $3
             ''',
-            filter_show_name(episode_info['metadata']['show_title']),
-            str(episode_info['season']),
-            str(episode_info['episode']),
+            filter_show_name(backlog_item.metadata['show_title']),
+            str(backlog_item.season),
+            str(backlog_item.episode),
         )
         return [
             {

@@ -6,7 +6,6 @@ import re
 from bs4 import BeautifulSoup
 
 from slurp.plugin_types import SearchPlugin
-from slurp.util import format_episode_info
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class LeetXSearchPlugin(SearchPlugin):
     async def run(self):
         pass
 
-    async def search(self, episode_info):
+    async def search(self, backlog_item):
         async def get_info(item):
             link = item.find('td', class_='name').find('a', href=re.compile('^/torrent/'))
             details_url = urllib.parse.urljoin(search_url, link['href'])
@@ -43,7 +42,7 @@ class LeetXSearchPlugin(SearchPlugin):
                 },
             }
 
-        query = format_episode_info(episode_info)
+        query = str(backlog_item)
         search_url = 'http://1337x.to/search/{}/1/'.format(urllib.parse.quote_plus(query))
         async with self.sem, self.core.session.get(search_url) as response:
             response_text = await response.text()

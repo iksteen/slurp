@@ -56,18 +56,18 @@ class RenameProcessingPlugin(PostProcessingPlugin):
         pass
 
     async def process(self, _, files):
-        backlog_keys = set(self.core.backlog)
+        backlog_keys = self.core.backlog.keys()
         rename_files = {}
 
         for path, path_info in files.items():
             file_size = path_info['size']
-            file_keys = path_info['episode_keys']
+            file_backlog_keys = path_info['backlog_keys']
 
-            if not file_keys:
+            if not file_backlog_keys:
                 logger.info('Ignoring file {}, not enough information.'.format(path))
                 continue
 
-            if not file_keys & backlog_keys:
+            if not file_backlog_keys & backlog_keys:
                 logger.info('Ignoring file {}, no backlog found'.format(path))
                 continue
 
@@ -78,42 +78,37 @@ class RenameProcessingPlugin(PostProcessingPlugin):
 
             ext = COMMON_EXTENSIONS.get(mime, mimetypes.guess_extension(mime))
 
-            key = (ext, file_keys)
+            key = (ext, file_backlog_keys)
             if file_size > rename_files.get(key, (None, 0))[1]:
                 rename_files[key] = (path, file_size)
 
         files = [
             (path, ext, [
-                self.core.backlog.get(file_key, {
-                    'show': file_key[0],
-                    'season': file_key[1],
-                    'episode': file_key[2],
-                    'title': 'UNKNOWN',
-                })
-                for file_key in file_keys
+                self.core.backlog[backlog_key]
+                for backlog_key in file_backlog_keys
             ])
-            for (ext, file_keys), (path, _) in rename_files.items()
+            for (ext, file_backlog_keys), (path, _) in rename_files.items()
         ]
         return await self._rename_files(files)
 
     async def _rename_files(self, files):
-        def get_destination(episodes_info, ext):
-            episodes_info = sorted(episodes_info, key=lambda e: e['episode'])
+        def get_destination(backlog_items, ext):
+            backlog_items = sorted(backlog_items, key=lambda item: item.episode)
 
-            show = UNSAFE_CHARS.sub('_', episodes_info[0]['metadata']['show_title'])
+            show = UNSAFE_CHARS.sub('_', backlog_items[0].metadata['show_title'])
 
-            season = episodes_info[0]['season']
+            season = backlog_items[0].season
             season_str = 'S%02d' % season
 
-            episodes = [e['episode'] for e in episodes_info]
+            episodes = [e.episode for e in backlog_items]
             episode = episodes[0]
 
-            if len(episodes_info) > 1:
+            if len(episodes) > 1:
                 episode_str = 'E%02d-E%02d' % (min(*episodes), max(*episodes))
             else:
                 episode_str = 'E%02d' % episodes[0]
 
-            title = UNSAFE_CHARS.sub(' ', '&'.join([e['metadata']['episode_title'] for e in episodes_info]))
+            title = UNSAFE_CHARS.sub(' ', '&'.join([e.metadata['episode_title'] for e in backlog_items]))
 
             return os.path.join(
                 self._destination,
@@ -134,9 +129,9 @@ class RenameProcessingPlugin(PostProcessingPlugin):
             [
                 (
                     path,
-                    get_destination(episodes_info, ext)
+                    get_destination(backlog_items, ext)
                 )
-                for path, ext, episodes_info in files
+                for path, ext, backlog_items in files
             ]
         )
 

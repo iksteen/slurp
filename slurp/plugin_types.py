@@ -21,23 +21,23 @@ class BackendPlugin(Plugin):
 
 class MetadataPlugin(Plugin, metaclass=ABCMeta):
     @abstractmethod
-    async def enrich(self, episode_info):
+    async def enrich(self, backlog_item):
         ...
 
 
 class SearchPlugin(Plugin, metaclass=ABCMeta):
     @abstractmethod
-    async def search(self, episode_info):
+    async def search(self, backlog_item):
         ...
 
 
 class DownloadPlugin(Plugin, metaclass=ABCMeta):
     @abstractmethod
-    def is_downloading(self, episode_info):
+    def is_downloading(self, backlog_item):
         ...
 
     @abstractmethod
-    async def download(self, episodes_info, data):
+    async def download(self, backlog_item, data):
         ...
 
 

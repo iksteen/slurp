@@ -2,8 +2,8 @@ import asyncio
 import json
 import logging
 
+from slurp.backlog import BacklogItem
 from slurp.plugin_types import BackendPlugin, MetadataPlugin
-from slurp.util import format_episode_info, filter_show_name
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +26,20 @@ class TraktMetadataPlugin(MetadataPlugin):
     async def run(self):
         pass
 
-    async def enrich(self, episode_info):
+    async def enrich(self, backlog_item):
         try:
-            result = await self.backend.trakt_request('shows/{ids[slug]}/seasons/{season}/episodes/{episode}', episode_info)
+            result = await self.backend.trakt_request(
+                'shows/{slug}/seasons/{season}/episodes/{episode}',
+                {
+                    'slug': backlog_item.show_id,
+                    'season': backlog_item.season,
+                    'episode': backlog_item.episode,
+                }
+            )
         except:
             logger.exception('Failed to retrieve extended episode info:')
-            return episode_info
         else:
-            episode_info.setdefault('metadata', {})['episode_title'] = result['title']
+            backlog_item.metadata['episode_title'] = result['title']
 
 
 class PostProcessorPlugin(object):
@@ -50,18 +56,18 @@ class TraktPostProcessorPlugin(PostProcessorPlugin):
     async def run(self):
         pass
 
-    async def process(self, episodes_info, _):
+    async def process(self, backlog_items, _):
         episodes = {}
-        for episode_info in episodes_info:
-            logger.info('Marking {} completed on trakt.tv'.format(format_episode_info(episode_info)))
+        for backlog_item in backlog_items:
+            logger.info('Marking {} completed on trakt.tv'.format(backlog_item))
             episodes.setdefault(
-                episode_info['ids']['slug'],
+                backlog_item.show_id,
                 {}
             ).setdefault(
-                episode_info['season'],
+                backlog_item.season,
                 set()
             ).add(
-                episode_info['episode']
+                backlog_item.episode
             )
 
         try:
@@ -248,11 +254,20 @@ class TraktBackendPlugin(BackendPlugin):
             else:
                 return json.loads(response)
 
-    async def _add_or_remove_episode(self, episode_info, collected):
+    async def _add_or_remove_episode(self, show, season, episode, collected):
+        item = BacklogItem(
+            show['ids']['slug'],
+            season,
+            episode,
+            {
+                'ids': show['ids'],
+                'show_title': show['title'],
+            },
+        )
         if collected:
-            self.core.backlog.remove_episode(episode_info)
+            self.core.backlog.remove_episode(item)
         else:
-            await self.core.backlog.add_episode(episode_info)
+            await self.core.backlog.add_episode(item)
 
     async def _process_show_progress(self, progress, show, rt_progress):
         coros = []
@@ -262,15 +277,9 @@ class TraktBackendPlugin(BackendPlugin):
             for episode in season['episodes']:
                 episode_number = episode['number']
                 coros.append(self._add_or_remove_episode(
-                    {
-                        'show_id': show['ids']['slug'],
-                        'season': season_number,
-                        'episode': int(episode_number),
-                        'ids': show['ids'],
-                        'metadata': {
-                            'show_title': show['title'],
-                        },
-                    },
+                    show,
+                    season_number,
+                    int(episode_number),
                     episode_number in season_progress,
                 ))
         if coros:
@@ -308,9 +317,9 @@ class TraktBackendPlugin(BackendPlugin):
     async def _process_list_content(self, data):
         shows = [show['show'] for show in data if show['type'] == 'show']
 
-        removed_shows = self.core.backlog.shows - set([filter_show_name(show['title']) for show in shows])
-        for show_title in removed_shows:
-            self.core.backlog.remove_show(show_title)
+        removed_shows = self.core.backlog.shows - set([show['ids']['slug'] for show in shows])
+        for show_id in removed_shows:
+            self.core.backlog.remove_show(show_id)
 
         try:
             data = await self.trakt_request('sync/collection/shows')
@@ -324,7 +333,7 @@ class TraktBackendPlugin(BackendPlugin):
             if self.custom_list:
                 data = await self.trakt_request('users/{username}/lists/{list}/items', {'list': self.custom_list})
             else:
-                data  = await self.trakt_request('sync/watchlist/shows')
+                data = await self.trakt_request('sync/watchlist/shows')
         except:
             logger.exception('Failed to get trakt.tv list:')
         else:

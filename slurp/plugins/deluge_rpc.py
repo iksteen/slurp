@@ -12,7 +12,6 @@ import bencoder
 import pyrencode
 
 from slurp.plugin_types import DownloadPlugin
-from slurp.util import key_for_episode, format_episode_info
 
 logger = logging.getLogger(__name__)
 
@@ -208,16 +207,15 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
                 logger.exception('Failed to check downloads:')
             await asyncio.sleep(self._interval, loop=self.loop)
 
-    def is_downloading(self, episode_info):
-        return key_for_episode(episode_info) in self._downloads
+    def is_downloading(self, backlog_item):
+        return backlog_item.key in self._downloads
 
-    async def download(self, episodes_info, data):
+    async def download(self, backlog_items, data):
         keys = []
-        for episode_info in episodes_info:
-            logger.info('Downloading {} using Deluge'.format(format_episode_info(episode_info)))
-            key = key_for_episode(episode_info)
-            self._downloads[key] = None
-            keys.append(key)
+        for backlog_item in backlog_items:
+            logger.info('Downloading {} using Deluge'.format(backlog_item))
+            self._downloads[backlog_item.key] = None
+            keys.append(backlog_item.key)
 
         seed_limit = self._origin_seed_limit.get(data['origin'], self._seed_limit)
         if seed_limit:
@@ -252,9 +250,9 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
             for key in keys:
                 del self._downloads[key]
         else:
-            for episode_info in episodes_info:
-                self._downloads[key_for_episode(episode_info)] = info_hash
-            self._torrent_ids.setdefault(info_hash, []).extend(episodes_info)
+            for backlog_item in backlog_items:
+                self._downloads[backlog_item.key] = info_hash
+            self._torrent_ids.setdefault(info_hash, []).extend(backlog_items)
 
             try:
                 await self._check_downloads([info_hash])
@@ -298,7 +296,7 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
             if not status[b'is_finished']:
                 return
 
-            episodes_info = self._torrent_ids.pop(torrent_id)
+            backlog_items = self._torrent_ids.pop(torrent_id)
 
             download_dir = status[b'save_path']
             await self.core.download.download_completed(
@@ -310,8 +308,8 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
                     for f in status[b'files']
                 ],
             )
-            for episode_info in episodes_info:
-                del self._downloads[key_for_episode(episode_info)]
+            for backlog_item in backlog_items:
+                del self._downloads[backlog_item.key]
 
         if torrent_ids is None:
             torrent_ids = list(self._torrent_ids.keys())
@@ -332,9 +330,9 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
         ]
 
         for missing_id in set(torrent_ids) - set(map(lambda r: r[0], result)):
-            episodes_info = self._torrent_ids.pop(missing_id)
-            for episode_info in episodes_info:
-                del self._downloads[key_for_episode(episode_info)]
+            backlog_items = self._torrent_ids.pop(missing_id)
+            for backlog_item in backlog_items:
+                del self._downloads[backlog_item.key]
 
         return await asyncio.gather(
             *(check_status(torrent_id, status) for torrent_id, status in result),

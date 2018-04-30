@@ -22,7 +22,7 @@ class TheTVDBMetadataPlugin(MetadataPlugin):
     async def run(self):
         pass
 
-    async def enrich(self, episode_info):
+    async def enrich(self, backlog_item):
         retries = 2
         try:
             while retries > 0:
@@ -41,14 +41,14 @@ class TheTVDBMetadataPlugin(MetadataPlugin):
 
                 headers['Authorization'] = 'Bearer {}'.format(self._token)
 
-                url = 'https://api.thetvdb.com/series/{}'.format(episode_info['ids']['tvdb'])
+                url = 'https://api.thetvdb.com/series/{}'.format(backlog_item.metadata['ids']['tvdb'])
                 async with self.core.session.get(url, headers=headers) as response:
                     if response.status == 401:
                         self._token = None
                         continue
                     response.raise_for_status()
                     data = await response.json()
-                episode_info['metadata']['show_title'] = data['data']['seriesName']
+                backlog_item.metadata['show_title'] = data['data']['seriesName']
                 return
             else:
                 raise Exception('Authentication keeps failing.')
