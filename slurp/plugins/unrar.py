@@ -54,31 +54,31 @@ class UnrarProcessingPlugin(PreProcessingPlugin):
         pass
 
     async def process(self, files):
-        async with self.sem:
-            async def process_archive(path):
+        async def process_archive(path):
+            async with self.sem:
                 try:
                     return await self.loop.run_in_executor(None, extract_archive, path)
                 except:
                     logger.exception('Failed to extract RAR archive {}:'.format(path))
                     return []
 
-            fs = []
-            for path, size in files:
-                filename = os.path.split(path)[1]
-                if os.path.splitext(filename)[1] == '.rar':
-                    m = DETECT_PART.search(path)
-                    if m and int(m.group(1)) != 1:
-                        # Only extract the first part of a multi-part rar file.
-                        continue
-                    logger.info('Extracting RAR archive: {}'.format(path))
-                    fs.append(process_archive(path))
+        fs = []
+        for path, size in files:
+            filename = os.path.split(path)[1]
+            if os.path.splitext(filename)[1] == '.rar':
+                m = DETECT_PART.search(path)
+                if m and int(m.group(1)) != 1:
+                    # Only extract the first part of a multi-part rar file.
+                    continue
+                logger.info('Extracting RAR archive: {}'.format(path))
+                fs.append(process_archive(path))
 
-            if not fs:
-                return files
+        if not fs:
+            return files
 
-            try:
-                extra_files = await asyncio.gather(*fs, loop=self.loop)
-                return tuple(itertools.chain.from_iterable([files] + extra_files))
-            except:
-                logger.exception('Failed concatenate file list:')
-                return files
+        try:
+            extra_files = await asyncio.gather(*fs, loop=self.loop)
+            return tuple(itertools.chain.from_iterable([files] + extra_files))
+        except:
+            logger.exception('Failed concatenate file list:')
+            return files
