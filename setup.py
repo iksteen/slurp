@@ -31,7 +31,9 @@ setup(
     author='Ingmar Steen',
     author_email='iksteen@gmail.com',
     url='https://github.com/iksteen/slurp',
+    license='MIT',
     packages=find_packages(),
+    python_requires='>=3.5',
     install_requires=requires,
     entry_points={
         'console_scripts': [
@@ -56,4 +58,18 @@ setup(
             'rename = slurp.plugins.rename:RenameProcessingPlugin',
         ],
     },
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Framework :: AsyncIO',
+        'Intended Audience :: End Users/Desktop',
+        'License :: OSI Approved :: MIT License',
+        'Natural Language :: English',
+        'Operating System :: OS Independent',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Topic :: Internet',
+        'Topic :: Multimedia :: Video',
+        'Topic :: Utilities',
+    ]
 )

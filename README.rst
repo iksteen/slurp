@@ -28,8 +28,7 @@ To install slurp, the easiest way currently is to create a python
 virtual environment and install it there: ::
 
     virtualenv -ppython3 slurp-env
-    source slurp-env/bin/activate
-    pip install -e https://github.com/iksteen/slurp/archive/master.zip
+    slurp-env/bin/pip install -e git+https://github.com/iksteen/slurp.git#egg=slurp
 
 Usage
 -----
@@ -54,8 +53,8 @@ Contributions are very welcome. Be sure not to copy any code from the
 Feel free to `submit issues`_, fork the `repository`_ and feed me your
 pull requests!
 
-slurp is published under a `BSD License`_.
+slurp is published under the `MIT License`_.
 
 .. _`submit issues`: https://github.com/iksteen/slurp/issues
 .. _`repository`: https://github.com/iksteen/slurp
-.. _`BSD License`: https://github.com/iksteen/slurp/blob/master/LICENSE
+.. _`MIT License`: https://github.com/iksteen/slurp/blob/master/LICENSE
