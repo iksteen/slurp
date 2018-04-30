@@ -7,7 +7,7 @@ import os
 import re
 import shutil
 
-from slurp.plugin_types import ProcessingPlugin
+from slurp.plugin_types import PostProcessingPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ COMMON_EXTENSIONS = {
 }
 
 
-class RenameProcessingPlugin(ProcessingPlugin):
+class RenameProcessingPlugin(PostProcessingPlugin):
     _destination = None
     _filename_format = os.path.join(
         '{show}',
@@ -50,15 +50,12 @@ class RenameProcessingPlugin(ProcessingPlugin):
             raise ValueError('Invalid rename plugin strategy')
 
     async def start(self):
-        self.core.download.register_notify_completed(self._on_download_completed)
+        pass
 
     async def run(self):
         pass
 
-    async def process(self, files):
-        return files
-
-    async def _on_download_completed(self, _, files):
+    async def process(self, _, files):
         backlog_keys = set(self.core.backlog)
         rename_files = {}
 

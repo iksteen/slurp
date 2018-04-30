@@ -53,7 +53,6 @@ class Search:
         self.plugins = load_plugins('search', SearchPlugin, 0, core, loop=self.loop)
 
     async def start(self):
-        self.core.backlog.register_notify_backlog(self._search_episode)
         await asyncio.gather(*(plugin.start() for plugin in self.plugins))
 
     async def run(self):
@@ -71,11 +70,11 @@ class Search:
             return
 
         await asyncio.gather(*(
-            self._search_episode(episode_info)
+            self.search_episode(episode_info)
             for episode_info in self.core.backlog.values()
         ))
 
-    async def _search_episode(self, episode_info):
+    async def search_episode(self, episode_info):
         async def search(plugin):
             try:
                 return await plugin.search(episode_info)

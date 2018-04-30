@@ -41,7 +41,13 @@ class DownloadPlugin(Plugin, metaclass=ABCMeta):
         ...
 
 
-class ProcessingPlugin(Plugin, metaclass=ABCMeta):
+class PreProcessingPlugin(Plugin, metaclass=ABCMeta):
     @abstractmethod
     async def process(self, files):
+        ...
+
+
+class PostProcessingPlugin(Plugin, metaclass=ABCMeta):
+    @abstractmethod
+    async def process(self, episodes_info, files):
         ...

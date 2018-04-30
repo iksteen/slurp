@@ -36,6 +36,65 @@ class TraktMetadataPlugin(MetadataPlugin):
             episode_info.setdefault('metadata', {})['episode_title'] = result['title']
 
 
+class PostProcessorPlugin(object):
+    pass
+
+
+class TraktPostProcessorPlugin(PostProcessorPlugin):
+    def __init__(self, backend):
+        self.backend = backend
+
+    async def start(self):
+        pass
+
+    async def run(self):
+        pass
+
+    async def process(self, episodes_info, _):
+        episodes = {}
+        for episode_info in episodes_info:
+            logger.info('Marking {} completed on trakt.tv'.format(format_episode_info(episode_info)))
+            episodes.setdefault(
+                episode_info['ids']['slug'],
+                {}
+            ).setdefault(
+                episode_info['season'],
+                set()
+            ).add(
+                episode_info['episode']
+            )
+
+        try:
+            await self.backend.trakt_request(
+                'sync/collection',
+                None,
+                {
+                    'shows': [
+                        {
+                            'ids': {
+                                'slug': slug,
+                            },
+                            'seasons': [
+                                {
+                                    'number': season,
+                                    'episodes': [
+                                        {
+                                            'number': episode,
+                                        }
+                                        for episode in episode_list
+                                    ],
+                                }
+                                for season, episode_list in seasons.items()
+                            ],
+                        }
+                        for slug, seasons in episodes.items()
+                    ],
+                },
+            )
+        except:
+            logger.exception('Failed to mark episodes completed on trakt.tv:')
+
+
 class TraktBackendPlugin(BackendPlugin):
     username = None
     client_id = None  # For oauth2 access
@@ -79,7 +138,7 @@ class TraktBackendPlugin(BackendPlugin):
 
     async def start(self):
         self.core.metadata.plugins.insert(0, TraktMetadataPlugin(self))
-        self.core.download.register_notify_completed(self._on_download_completed)
+        self.core.download.post_processing_plugins.append(TraktPostProcessorPlugin(self))
 
     async def run(self):
         while True:
@@ -270,47 +329,3 @@ class TraktBackendPlugin(BackendPlugin):
             logger.exception('Failed to get trakt.tv list:')
         else:
             await self._process_list_content(data)
-
-    async def _on_download_completed(self, episodes_info, _):
-        episodes = {}
-        for episode_info in episodes_info:
-            logger.info('Marking {} completed on trakt.tv'.format(format_episode_info(episode_info)))
-            episodes.setdefault(
-                episode_info['ids']['slug'],
-                {}
-            ).setdefault(
-                episode_info['season'],
-                set()
-            ).add(
-                episode_info['episode']
-            )
-
-        try:
-            await self.trakt_request(
-                'sync/collection',
-                None,
-                {
-                    'shows': [
-                        {
-                            'ids': {
-                                'slug': slug,
-                            },
-                            'seasons': [
-                                {
-                                    'number': season,
-                                    'episodes': [
-                                        {
-                                            'number': episode,
-                                        }
-                                        for episode in episode_list
-                                    ],
-                                }
-                                for season, episode_list in seasons.items()
-                            ],
-                        }
-                        for slug, seasons in episodes.items()
-                    ],
-                },
-            )
-        except:
-            logger.exception('Failed to mark episodes completed on trakt.tv:')

@@ -1,15 +1,10 @@
 import asyncio
 import logging
 
-from slurp.plugin_types import ProcessingPlugin, DownloadPlugin
+from slurp.plugin_types import DownloadPlugin, PreProcessingPlugin, PostProcessingPlugin
 from slurp.util import format_episode_info, guess_episode_keys_for_path, load_plugins, filter_show_name
 
 logger = logging.getLogger(__name__)
-
-
-async def log_completed(episodes_info, _):
-    for episode_info in episodes_info:
-        logger.info('Download completed: {}'.format(format_episode_info(episode_info)))
 
 
 class Download:
@@ -19,16 +14,17 @@ class Download:
 
         self._blacklist = []
 
-        self._notify_completed = [log_completed]
-
-        self.processing_plugins = load_plugins('processing', ProcessingPlugin, 10, core, loop=self.loop)
+        self.pre_processing_plugins = load_plugins('pre_processing', PreProcessingPlugin, 10, core, loop=self.loop)
+        self.post_processing_plugins = load_plugins('post_processing', PostProcessingPlugin, 10, core, loop=self.loop)
         self.download_plugins = load_plugins('download', DownloadPlugin, 10, core, loop=self.loop)
 
     async def start(self):
-        return await asyncio.gather(*(plugin.start() for plugin in self.processing_plugins + self.download_plugins))
+        plugins = self.pre_processing_plugins + self.post_processing_plugins + self.download_plugins
+        return await asyncio.gather(*(plugin.start() for plugin in plugins))
 
     async def run(self):
-        return await asyncio.gather(*(plugin.run() for plugin in self.processing_plugins + self.download_plugins))
+        plugins = self.pre_processing_plugins + self.post_processing_plugins + self.download_plugins
+        return await asyncio.gather(*(plugin.run() for plugin in plugins))
 
     @property
     def supported_media(self):
@@ -56,12 +52,9 @@ class Download:
 
         await provider.download(episodes_info, data)
 
-    def register_notify_completed(self, callback):
-        self._notify_completed.append(callback)
-
     async def download_completed(self, files):
-        for post_processor in self.processing_plugins:
-            files = await post_processor.process(files)
+        for processor in self.pre_processing_plugins:
+            files = await processor.process(files)
 
         backlog_map = {
             (
@@ -95,7 +88,8 @@ class Download:
             )
         ]
 
-        await asyncio.gather(*(callback(episodes_info, files) for callback in self._notify_completed))
+        await asyncio.gather(*(processor.process(episodes_info, files) for processor in self.post_processing_plugins))
 
         for episode_info in episodes_info:
+            logger.info('Download completed: {}'.format(format_episode_info(episode_info)))
             self.core.backlog.remove_episode(episode_info)

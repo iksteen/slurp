@@ -6,7 +6,7 @@ import itertools
 
 import rarfile
 
-from slurp.plugin_types import ProcessingPlugin
+from slurp.plugin_types import PreProcessingPlugin
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def extract_archive(path):
     return extracted_files
 
 
-class UnrarProcessingPlugin(ProcessingPlugin):
+class UnrarProcessingPlugin(PreProcessingPlugin):
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()

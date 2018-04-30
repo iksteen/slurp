@@ -53,8 +53,10 @@ setup(
         'slurp.plugins.download': [
             'deluge_rpc = slurp.plugins.deluge_rpc:DelugeRpcDownloadPlugin',
         ],
-        'slurp.plugins.processing': [
+        'slurp.plugins.pre_processing': [
             'unrar = slurp.plugins.unrar:UnrarProcessingPlugin',
+        ],
+        'slurp.plugins.post_processing': [
             'rename = slurp.plugins.rename:RenameProcessingPlugin',
         ],
     },

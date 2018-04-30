@@ -11,12 +11,6 @@ class Backlog:
     def __init__(self, core):
         self.core = core
         self._backlog = {}
-        self._notify_backlog = []
-
-    def register_notify_backlog(self, callback):
-        self._notify_backlog.append(callback)
-        for backlog_item in self._backlog:
-            callback(*backlog_item)
 
     async def add_episode(self, episode_info):
         logger.info('Adding {} to backlog queue'.format(format_episode_info(episode_info)))
@@ -28,7 +22,7 @@ class Backlog:
 
         self._backlog[key] = episode_info
 
-        await asyncio.gather(*(callback(episode_info) for callback in self._notify_backlog))
+        await self.core.search.search_episode(episode_info)
 
     def remove_episode(self, episode_info):
         if self._backlog.pop(key_for_episode(episode_info), None) is not None:
