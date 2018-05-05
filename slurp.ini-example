@@ -53,8 +53,10 @@
 ; db_name = slurp
 
 [slurp.processing.renamer]
-; destination = /media/multimedia/series
-; format = {show}/Season {season:02}/{show} - {season_str}{episode_str} - {title}{ext}
+; episode_destination =
+; episode_format = {show}/Season {season:02}/{show} - {season_str}{episode_str} - {title}{ext}
+; movie_destination =
+; movie_format = {title} {year}{ext}
 ; dir_mode = 770
 ; file_mode = 660
 

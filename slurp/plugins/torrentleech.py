@@ -9,6 +9,7 @@ import guessit
 from babelfish import Language, Country
 from defusedxml.ElementTree import fromstring
 
+from slurp.backlog import EpisodeBacklogItem, MovieBacklogItem
 from slurp.plugin_types import SearchPlugin
 from slurp.util import filter_show_name
 
@@ -151,19 +152,36 @@ class TorrentLeechSearchPlugin(SearchPlugin):
             ttl = 60 * int(channel.find('ttl').text)
             await asyncio.sleep(ttl)
 
-    async def search(self, episode_info):
-        results = await self._pool.fetch(
-            '''
-                SELECT *
-                FROM torrentleech
-                WHERE metadata->>'title' ILIKE $1
-                AND metadata->>'season' = $2
-                AND metadata->>'episode'= $3
-            ''',
-            filter_show_name(episode_info['metadata']['show_title']),
-            str(episode_info['season']),
-            str(episode_info['episode']),
-        )
+    async def search(self, backlog_item):
+        if isinstance(backlog_item, EpisodeBacklogItem):
+            results = await self._pool.fetch(
+                '''
+                    SELECT *
+                    FROM torrentleech
+                    WHERE metadata->>'type' = 'episode'
+                    AND metadata->>'title' ILIKE $1
+                    AND metadata->>'season' = $2
+                    AND metadata->>'episode'= $3
+                ''',
+                filter_show_name(backlog_item.metadata['show_title']),
+                str(backlog_item.season),
+                str(backlog_item.episode),
+            )
+        elif isinstance(backlog_item, MovieBacklogItem):
+            results = await self._pool.fetch(
+                '''
+                    SELECT *
+                    FROM torrentleech
+                    WHERE metadata->>'type' = 'movie'
+                    AND metadata->>'title' ILIKE $1
+                    AND metadata->>'year' = $2
+                ''',
+                filter_show_name(backlog_item.metadata['movie_title']),
+                str(backlog_item.metadata['year']),
+            )
+        else:
+            results = []
+
         return [
             {
                 'origin': self,

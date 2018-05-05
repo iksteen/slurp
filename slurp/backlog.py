@@ -1,10 +1,62 @@
-import asyncio
-
 import logging
 
-from slurp.util import format_episode_info, key_for_episode
+from slurp.util import filter_show_name
 
 logger = logging.getLogger(__name__)
+
+
+class BacklogItem:
+    def __init__(self, object_id, metadata):
+        self.key = object()
+        self.object_id = object_id
+        self.metadata = metadata
+
+    def identity(self):
+        raise NotImplemented
+
+
+class EpisodeBacklogItem:
+    def __init__(self, object_id, season, episode, metadata):
+        self.key = object()
+        self.object_id = object_id
+        self.season = season
+        self.episode = episode
+        self.metadata = metadata
+
+    def identity(self):
+        return (
+            filter_show_name(self.metadata['show_title']),
+            self.season,
+            self.episode,
+        )
+
+    def __eq__(self, other):
+        return isinstance(other, EpisodeBacklogItem) and self.object_id == other.object_id and \
+               self.season == other.season and self.episode == other.episode
+
+    def __str__(self):
+        return '{show_title} S{season:02d}E{episode:02d}'.format(
+            season=self.season,
+            episode=self.episode,
+            **self.metadata,
+        )
+
+
+class MovieBacklogItem(BacklogItem):
+    def __init__(self, object_id, metadata):
+        super().__init__(object_id, metadata)
+
+    def identity(self):
+        return (
+            filter_show_name(self.metadata['movie_title']),
+            self.metadata['year'],
+        )
+
+    def __eq__(self, other):
+        return isinstance(other, MovieBacklogItem) and self.object_id == other.object_id
+
+    def __str__(self):
+        return '{movie_title} ({year})'.format(**self.metadata)
 
 
 class Backlog:
@@ -12,49 +64,51 @@ class Backlog:
         self.core = core
         self._backlog = {}
 
-    async def add_episode(self, episode_info):
-        logger.info('Adding {} to backlog queue'.format(format_episode_info(episode_info)))
-        key = key_for_episode(episode_info)
-        if key in self._backlog:
+    async def add_item(self, item):
+        if self.find(item) is not None:
             return
+        logger.info('Adding {} to backlog queue'.format(item))
 
-        await self.core.metadata.enrich(episode_info)
+        await self.core.metadata.enrich(item)
 
-        self._backlog[key] = episode_info
+        self._backlog[item.key] = item
 
-        await self.core.search.search_episode(episode_info)
+        await self.core.search.search_backlog_item(item)
 
-    def remove_episode(self, episode_info):
-        if self._backlog.pop(key_for_episode(episode_info), None) is not None:
-            logger.info('Removed {} from backlog queue'.format(format_episode_info(episode_info)))
+    def remove_item(self, item):
+        item = self.find(item)
+        if item is not None:
+            del self._backlog[item.key]
+            logger.info('Removed {} from backlog queue'.format(item))
 
-    @property
-    def shows(self):
-        return set(key[0] for key in self._backlog.keys())
+    def object_ids(self, restrict_type=None):
+        return set(
+            item.object_id
+            for item in self._backlog.values()
+            if restrict_type is None or isinstance(type, restrict_type)
+        )
 
-    def remove_show(self, show):
-        episode_keys = [key for key in self._backlog.keys() if key[0] == show]
-        for episode_key in episode_keys:
-            self._backlog.pop(episode_key)
-            logger.info('Removed {} S{:02}E{:02} from backlog queue'.format(*episode_key))
+    def remove_by_object_id(self, object_id):
+        items = [item for item in self._backlog.values() if item.object_id == object_id]
+        for item in items:
+            del self._backlog[item.key]
+            logger.info('Removed {} from backlog queue'.format(item))
 
-    def __nonzero__(self):
-        return bool(self._backlog)
+    def empty(self):
+        return not bool(self._backlog)
 
-    def __contains__(self, item):
-        return item in self._backlog
-
-    def __iter__(self):
-        return self._backlog.__iter__()
+    def keys(self):
+        return set(self._backlog.keys())
 
     def values(self):
         return self._backlog.values()
 
-    def items(self):
-        return self._backlog.items()
-
     def __getitem__(self, item):
         return self._backlog[item]
 
-    def get(self, item, default=None):
-        return self._backlog.get(item, default)
+    def find(self, placeholder):
+        for item in self._backlog.values():
+            if item == placeholder:
+                return item
+        else:
+            return None

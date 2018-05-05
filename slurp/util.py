@@ -1,26 +1,15 @@
 import configparser
 
 import operator
-import os
 import pkg_resources
 import re
 import logging
 
 import guessit
 
+from slurp import movie_guessit
+
 logger = logging.getLogger(__name__)
-
-
-def format_episode_info(episode_info):
-    return '{show_title} S{season:02d}E{episode:02d}'.format(
-        show_title=episode_info['metadata']['show_title'],
-        **episode_info
-    )
-
-
-def key_for_episode(episode_info):
-    return episode_info['show_id'], episode_info['season'], episode_info['episode']
-
 
 FILTER_STRIP_CHARS = re.compile(r'["()\[\]]')
 FILTER_SPACE_CHARS = re.compile(r'[\'-.,_+:]')
@@ -41,43 +30,26 @@ def filter_show_name(title):
     ).strip()
 
 
-def guess_episode_info(title):
+def guess_media_info(title, *, movie=False):
+    if not movie:
+        try:
+            info = guessit.guessit(title)
+        except:
+            logger.error('guessit failed to guess {}:'.format(title))
+            return {}
+        else:
+            if 'title' in info:
+                if isinstance(info.get('episode'), int):
+                    info['episode'] = [info['episode']]
+                return info
+
     try:
-        info = guessit.guessit(title)
+        info = movie_guessit.movie_guessit(title)
     except:
         logger.error('guessit failed to guess {}:'.format(title))
         return {}
     else:
-        if isinstance(info.get('episode'), int):
-            info['episode'] = [info['episode']]
         return info
-
-
-def guess_episode_keys_for_path(path):
-    filename = os.path.split(path)[1]
-
-    info = guess_episode_info(filename)
-    if info.get('type') != 'episode' or 'season' not in info or 'episode' not in info:
-        info = guess_episode_info(path)
-        if info.get('type') != 'episode' or 'season' not in info or 'episode' not in info:
-            return []
-
-    show = filter_show_name(info['title'])
-    if 'year' in info:
-        show += ' {}'.format(info['year'])
-    if 'country' in info:
-        show += ' {}'.format(str(info['country']).lower())
-
-    season = info['season']
-    if isinstance(info['episode'], int):
-        episodes = frozenset([info['episode']])
-    else:
-        episodes = frozenset(info['episode'])
-
-    return frozenset([
-        (show, season, episode)
-        for episode in episodes
-    ])
 
 
 def parse_option_list(s):

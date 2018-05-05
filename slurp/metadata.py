@@ -19,6 +19,6 @@ class Metadata:
     async def run(self):
         return await asyncio.gather(*(plugin.run() for plugin in self.plugins), loop=self.loop)
 
-    async def enrich(self, episode_info):
+    async def enrich(self, backlog_item):
         for plugin in self.plugins:
-            await plugin.enrich(episode_info)
+            await plugin.enrich(backlog_item)
