@@ -134,7 +134,7 @@ class Search:
 
     def _filter_by_info(self, results, backlog_item):
         if isinstance(backlog_item, EpisodeBacklogItem):
-            show_info = guess_media_info(backlog_item.metadata['show_title'])
+            show_info = guess_media_info(backlog_item.metadata['show_title'] + ' S01E01')
             show_title = filter_show_name(show_info['title'])
             season = backlog_item.season
             episode = backlog_item.episode
