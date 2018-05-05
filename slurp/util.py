@@ -7,6 +7,8 @@ import logging
 
 import guessit
 
+from slurp import movie_guessit
+
 logger = logging.getLogger(__name__)
 
 FILTER_STRIP_CHARS = re.compile(r'["()\[\]]')
@@ -28,15 +30,25 @@ def filter_show_name(title):
     ).strip()
 
 
-def guess_media_info(title):
+def guess_media_info(title, *, movie=False):
+    if not movie:
+        try:
+            info = guessit.guessit(title)
+        except:
+            logger.error('guessit failed to guess {}:'.format(title))
+            return {}
+        else:
+            if 'title' in info:
+                if isinstance(info.get('episode'), int):
+                    info['episode'] = [info['episode']]
+                return info
+
     try:
-        info = guessit.guessit(title)
+        info = movie_guessit.movie_guessit(title)
     except:
         logger.error('guessit failed to guess {}:'.format(title))
         return {}
     else:
-        if isinstance(info.get('episode'), int):
-            info['episode'] = [info['episode']]
         return info
 
 

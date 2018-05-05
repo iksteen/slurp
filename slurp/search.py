@@ -152,7 +152,7 @@ class Search:
                 )
             ]
         elif isinstance(backlog_item, MovieBacklogItem):
-            movie_info = guess_media_info(backlog_item.metadata['movie_title'])
+            movie_info = guess_media_info(backlog_item.metadata['movie_title'], movie=True)
             movie_title = filter_show_name(movie_info['title'])
             year = backlog_item.metadata['year']
 
