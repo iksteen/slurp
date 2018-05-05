@@ -5,6 +5,7 @@ import urllib.parse
 import re
 from bs4 import BeautifulSoup
 
+from slurp.backlog import EpisodeBacklogItem, MovieBacklogItem
 from slurp.plugin_types import SearchPlugin
 
 logger = logging.getLogger(__name__)
@@ -42,8 +43,15 @@ class LeetXSearchPlugin(SearchPlugin):
                 },
             }
 
+        if isinstance(backlog_item, EpisodeBacklogItem):
+            category = 'TV'
+        elif isinstance(backlog_item, MovieBacklogItem):
+            category = 'Movies'
+        else:
+            return []
         query = str(backlog_item)
-        search_url = 'http://1337x.to/search/{}/1/'.format(urllib.parse.quote_plus(query))
+        search_url = 'https://1337x.to/category-search/{}/{}/1/'.format(urllib.parse.quote_plus(query), category)
+
         async with self.sem, self.core.session.get(search_url) as response:
             response_text = await response.text()
 
