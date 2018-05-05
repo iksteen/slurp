@@ -28,7 +28,11 @@ class LeetXSearchPlugin(SearchPlugin):
             link = item.find('td', class_='name').find('a', href=re.compile('^/torrent/'))
             details_url = urllib.parse.urljoin(search_url, link['href'])
             async with self.sem, self.core.session.get(details_url) as response:
-                response_text = await response.text()
+                try:
+                    response_text = await response.text()
+                except:
+                    logger.exception('Failed to parse response body:')
+                    return None
 
             magnet_uri = BeautifulSoup(response_text, 'lxml').find('a', href=re.compile('^magnet:'))['href']
             return {
@@ -59,7 +63,8 @@ class LeetXSearchPlugin(SearchPlugin):
         if body is None:
             return []
 
-        return await asyncio.gather(*(
-            get_info(item)
-            for item in body('tr')
-        ))
+        return [
+            item
+            for item in await asyncio.gather(*(get_info(item) for item in body('tr')))
+            if item is not None
+        ]
