@@ -22,8 +22,6 @@ class Search:
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()
 
-        self.plugins = []
-
         self._dl_blacklist = {}
 
         self._filter = {}
@@ -51,7 +49,8 @@ class Search:
 
         self._blacklist = parse_option_list(blacklist)
 
-        self.plugins = load_plugins('search', SearchPlugin, 0, core, loop=self.loop)
+        self.plugin_map = load_plugins('search', SearchPlugin, 0, core, loop=self.loop)
+        self.plugins = list(self.plugin_map.values())
 
     async def start(self):
         await asyncio.gather(*(plugin.start() for plugin in self.plugins))

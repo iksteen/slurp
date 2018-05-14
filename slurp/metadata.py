@@ -11,7 +11,8 @@ class Metadata:
     def __init__(self, core, *, loop=None):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()
-        self.plugins = load_plugins('metadata', MetadataPlugin, 10, core, loop=self.loop)
+        self.plugin_map = load_plugins('metadata', MetadataPlugin, 10, core, loop=self.loop)
+        self.plugins = list(self.plugin_map.values())
 
     async def start(self):
         return await asyncio.gather(*(plugin.start() for plugin in self.plugins), loop=self.loop)

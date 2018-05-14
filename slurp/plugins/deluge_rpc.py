@@ -156,6 +156,7 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
         self.core = core
         self.loop = loop if loop is not None else asyncio.get_event_loop()
 
+        self._origin_seed_limit_by_name = {}
         self._origin_seed_limit = {}
         self._downloads = {}
         self._torrent_ids = {}
@@ -184,7 +185,7 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
             for key, value in section.items():
                 if key.startswith('seed_limit.'):
                     origin = key.split('.', 1)[1]
-                    self._origin_seed_limit[origin] = float(value)
+                    self._origin_seed_limit_by_name[origin] = float(value)
         except NoSectionError:
             pass
         except:
@@ -197,7 +198,10 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
         self._client = DelugeRpcClient(self._rpc_host, self._rpc_port, self._rpc_username, self._rpc_password)
 
     async def start(self):
-        pass
+        for origin, seed_limit in self._origin_seed_limit_by_name.items():
+            plugin = self.core.search.plugin_map.get(origin)
+            if plugin is not None:
+                self._origin_seed_limit[plugin] = seed_limit
 
     async def run(self):
         while True:

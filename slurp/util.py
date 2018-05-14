@@ -1,4 +1,5 @@
 import configparser
+from collections import OrderedDict
 
 import operator
 import pkg_resources
@@ -88,6 +89,9 @@ def load_plugins(section_name, abc, default_priority, core, *args, **kwargs):
                 except:
                     logger.exception('Failed to load plugin:')
                 else:
-                    plugins.append((priority, plugin))
+                    plugins.append((priority, entrypoint.name, plugin))
 
-    return [plugin for priority, plugin in sorted(plugins, key=operator.itemgetter(0))]
+    return OrderedDict([
+        (plugin_name, plugin)
+        for _, plugin_name, plugin in sorted(plugins, key=operator.itemgetter(0))
+    ])

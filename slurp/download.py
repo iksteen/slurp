@@ -49,9 +49,14 @@ class Download:
 
         self._blacklist = []
 
-        self.pre_processing_plugins = load_plugins('pre_processing', PreProcessingPlugin, 10, core, loop=self.loop)
-        self.post_processing_plugins = load_plugins('post_processing', PostProcessingPlugin, 10, core, loop=self.loop)
-        self.download_plugins = load_plugins('download', DownloadPlugin, 10, core, loop=self.loop)
+        self.pre_processing_plugin_map = load_plugins('pre_processing', PreProcessingPlugin, 10, core, loop=self.loop)
+        self.pre_processing_plugins = list(self.pre_processing_plugin_map.values())
+
+        self.post_processing_plugin_map = load_plugins('post_processing', PostProcessingPlugin, 10, core, loop=self.loop)
+        self.post_processing_plugins = list(self.post_processing_plugin_map.values())
+
+        self.download_plugin_map = load_plugins('download', DownloadPlugin, 10, core, loop=self.loop)
+        self.download_plugins = list(self.download_plugin_map.values())
 
     async def start(self):
         plugins = self.pre_processing_plugins + self.post_processing_plugins + self.download_plugins
