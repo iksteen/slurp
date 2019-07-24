@@ -3,7 +3,9 @@ import base64
 import hashlib
 import os
 import logging
+import re
 import ssl
+import struct
 import urllib.parse
 import zlib
 from configparser import NoSectionError
@@ -31,7 +33,8 @@ class DelugeRpcClientProtocol(asyncio.Protocol):
                 await self.call_remote(
                     'daemon.login',
                     self.client.username,
-                    self.client.password
+                    self.client.password,
+                    client_version='2.0.0',
                 )
             except Exception as exc:
                 logger.exception('Failed to authenticate to Deluge:')
@@ -44,21 +47,40 @@ class DelugeRpcClientProtocol(asyncio.Protocol):
 
     def data_received(self, data):
         self._buffer.extend(data)
+        if len(self._buffer) < 5:
+            return
+
+        protocol_version, message_length = struct.unpack('!BI', self._buffer[:5])
+        if protocol_version != 1:
+            logger.error('Invalid protocol version received: %d', protocol_version)
+            self._buffer = bytearray()
+            return
+
+        if len(self._buffer) < 5 + message_length:
+            return
+
+        message_data = self._buffer[5:5 + message_length]
+        self._buffer = self._buffer[5 + message_length:]
+
         d_obj = zlib.decompressobj()
         try:
-            message = pyrencode.loads(d_obj.decompress(self._buffer))
+            message = pyrencode.loads(d_obj.decompress(message_data))
         except (ValueError, zlib.error):
             logger.exception('Error while decoding buffer')
             return
-        else:
-            self._buffer = bytearray(d_obj.unused_data)
 
         try:
             if message[0] == 1:
                 request_id, result = message[1:]
                 self._pending.pop(request_id).set_result(result)
             elif message[0] == 2:
-                request_id, (err_class, err_msg, err_tb) = message[1:]
+                request_id, err_class, err_args, err_kwargs, err_tb = message[1:]
+                err_msg = '%s(%s%s%s)' % (
+                    err_class,
+                    ', '.join(map(repr, err_args)),
+                    ', ' if err_args and err_kwargs else '',
+                    ', '.join('%s=%s' % (key, repr(value)) for key, value in err_kwargs.items())
+                )
                 self._pending.pop(request_id).set_exception(Exception(err_msg))
         except:
             logger.exception('Error while processing Deluge RPC repsonse:')
@@ -72,6 +94,8 @@ class DelugeRpcClientProtocol(asyncio.Protocol):
         request_id = self._request_id
         self._pending[request_id] = f = self.loop.create_future()
         payload = zlib.compress(pyrencode.dumps([[request_id, method, args, kwargs]]))
+        header = struct.pack('!BI', 1, len(payload))
+        self.transport.write(header)
         self.transport.write(payload)
         return await f
 
@@ -249,19 +273,23 @@ class DelugeRpcDownloadPlugin(DownloadPlugin):
 
         try:
             info_hash = await coro
-        except:
-            logger.exception('Failed to add torrent ({}) to Deluge:'.format(url))
-            for key in keys:
-                del self._downloads[key]
-        else:
-            for backlog_item in backlog_items:
-                self._downloads[backlog_item.key] = info_hash
-            self._torrent_ids.setdefault(info_hash, []).extend(backlog_items)
+        except Exception as e:
+            m = re.search(r'Torrent already (in session|being added) \(([0-9a-f]{40})\)', str(e))
+            if m:
+                info_hash = m.group(2)
+            else:
+                logger.exception('Failed to add torrent ({}) to Deluge:'.format(url))
+                for key in keys:
+                    del self._downloads[key]
+                return
 
-            try:
-                await self._check_downloads([info_hash])
-            except:
-                logger.exception('Failed to check download status:')
+        for backlog_item in backlog_items:
+            self._downloads[backlog_item.key] = info_hash
+        self._torrent_ids.setdefault(info_hash, []).extend(backlog_items)
+        try:
+            await self._check_downloads([info_hash])
+        except:
+            logger.exception('Failed to check download status:')
 
     async def _add_torrent_url(self, url, options):
         async with self.core.session.get(url) as response:
