@@ -254,15 +254,15 @@ class TraktBackendPlugin(BackendPlugin):
             except UnauthorizedError:
                 if not self.refresh_token:
                     self.access_token = ''
-                    self.core.config.set('slurp.back_end.trakt', 'access_token', self.access_token)
+                    self.core.config.set('slurp.backend.trakt', 'access_token', self.access_token)
                     self.core.save_config()
                     raise RuntimeError('Invalid refresh_token, please request a new PIN code and update settings.')
 
                 refresh_token = self.refresh_token
                 self.access_token = ''
                 self.refresh_token = ''
-                self.core.config.set('slurp.back_end.trakt', 'access_token', self.access_token)
-                self.core.config.set('slurp.back_end.trakt', 'refresh_token', self.refresh_token)
+                self.core.config.set('slurp.backend.trakt', 'access_token', self.access_token)
+                self.core.config.set('slurp.backend.trakt', 'refresh_token', self.refresh_token)
                 self.core.save_config()
 
                 await self._trakt_exchange_code(refresh_token)
