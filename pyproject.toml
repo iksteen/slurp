@@ -1,0 +1,53 @@
+[tool.poetry]
+name = "slurp"
+version = "0.9.0"
+description = "Automatic TV show download orchestrator"
+authors = ["Ingmar Steen <iksteen@gmail.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+appdirs = "^1.4.3"
+rarfile = "^3.1"
+bencoder = "^0.2.0"
+aiohttp = "^3.6.2"
+click = "^7.0"
+python-dateutil = "^2.8.1"
+requests = "^2.22.0"
+babelfish = "^0.5.5"
+defusedxml = "^0.6.0"
+pyrencode = "^0.1.4"
+cidict = "^0.1.1"
+asyncpg = "^0.20.0"
+beautifulsoup4 = "^4.8.1"
+lxml = "^4.4.1"
+guessit = "^3.1.0"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+slurp = "slurp.__main__:main"
+
+[tool.poetry.plugins."slurp.plugins.backend"]
+trakt = "slurp.plugins.trakt:TraktBackendPlugin"
+
+[tool.poetry.plugins."slurp.plugins.metadata"]
+tvdb = "slurp.plugins.tvdb:TheTVDBMetadataPlugin"
+scene_names = "slurp.plugins.scene_names:SceneNamesMetadataPlugin"
+
+[tool.poetry.plugins."slurp.plugins.search"]
+torrentleech = "slurp.plugins.torrentleech:TorrentLeechSearchPlugin"
+1337x = "slurp.plugins.1337x:LeetXSearchPlugin"
+
+[tool.poetry.plugins."slurp.plugins.download"]
+deluge_rpc = "slurp.plugins.deluge_rpc:DelugeRpcDownloadPlugin"
+
+[tool.poetry.plugins."slurp.plugins.pre_processing"]
+unrar = "slurp.plugins.unrar:UnrarProcessingPlugin"
+
+[tool.poetry.plugins."slurp.plugins.post_processing"]
+rename = "slurp.plugins.rename:RenameProcessingPlugin"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
