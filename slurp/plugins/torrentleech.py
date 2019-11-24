@@ -120,7 +120,12 @@ class TorrentLeechSearchPlugin(SearchPlugin):
                 else:
                     leechers = None
 
-                metadata = dict(guessit.guessit(link.rsplit('/', 1)[-1]).items())
+                try:
+                    metadata = dict(guessit.guessit(link.rsplit('/', 1)[-1]).items())
+                except Exception:
+                    logger.exception('Failed to parse TL data:')
+                    continue
+
                 async with self._pool.acquire() as conn:
                     txn = conn.transaction()
                     await txn.start()
